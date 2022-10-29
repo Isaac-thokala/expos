@@ -1,0 +1,30 @@
+decl
+ int gcd(int a,int b),rem;
+enddecl
+
+int gcd(int a,int b)
+{
+ begin
+	while(b!=0) do
+		rem = a % b;
+		a = b;
+		b = rem;
+	endwhile; 
+	write(a);
+	return 0;
+ end
+}
+
+int main()
+{
+ decl
+  int a,b,c;
+ enddecl
+
+ begin
+  read(a);
+  read(b);
+  c = gcd(a,b);
+  return 0;
+ end 
+} 

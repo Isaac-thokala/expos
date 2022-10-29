@@ -1,0 +1,61 @@
+alias functionNum R1;
+alias currentPID R2;
+alias word R3;
+
+if(functionNum == TERMINAL_WRITE) then
+	
+	//calling acquire terminal
+	multipush(R1,R2,R3);
+
+	functionNum = ACQUIRE_TERMINAL;
+
+	
+	call MOD_0;
+
+	multipop(R1,R2,R3);
+	print R3; //R3=word
+
+	//calling release terminal
+	multipush(R1,R2,R3);
+	functionNum = RELEASE_TERMINAL;
+
+	call MOD_0;
+
+	multipop(R1,R2,R3);
+	
+endif;
+
+if(functionNum == TERMINAL_READ) 
+then
+
+
+	multipush(R1,R2,R3);
+
+	functionNum = ACQUIRE_TERMINAL;
+	call MOD_0;
+
+	multipop(R1,R2,R3);
+	
+	
+	
+	[PROCESS_TABLE + ( currentPID * 16 ) + 4] = WAIT_TERMINAL;
+	read;
+	
+	
+	//schedule other process while this process is waiting for console iinterrupt
+	
+	
+	
+	multipush(R1,R2,R3);
+	call MOD_5;
+	multipop(R1,R2,R3);
+	
+	
+	
+	
+	alias realwordAdd R4;
+	realwordAdd = [PTBR + 2* (word / 512)] * 512 + (word % 512); 
+	[realwordAdd] = [PROCESS_TABLE + ( currentPID * 16 ) + 8];
+endif;
+
+return;

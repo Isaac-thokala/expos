@@ -1,1 +1,18 @@
+SP = [PROCESS_TABLE + ([SYSTEM_STATUS_TABLE + 1] * 16) + 11] * 512 -1;
+[PROCESS_TABLE + ( [SYSTEM_STATUS_TABLE + 1] * 16) + 4] = TERMINATED;
+alias process R0;
+process=1;
+alias count R1;
+count=0;
+while(process<16) do
+ if([PROCESS_TABLE + (process* 16) + 4] == TERMINATED) then
+ count=count+1;
+ endif;
+ process=process+1;
+endwhile;
+if(count==15) then
 halt;
+endif;
+if(count<15) then
+call MOD_5;
+endif;
