@@ -1,0 +1,94 @@
+[PROCESS_TABLE + [SYSTEM_STATUS_TABLE + 1] + 9] = -1;
+
+breakpoint;
+
+[PROCESS_TABLE + ([SYSTEM_STATUS_TABLE + 1] * 16) + 13] = SP;
+SP = [PROCESS_TABLE + ( [SYSTEM_STATUS_TABLE + 1] * 16 ) + 11] * 512 -1;
+
+backup;
+
+alias userSP R1;
+userSP = [PROCESS_TABLE + ([SYSTEM_STATUS_TABLE + 1] * 16) + 13];
+
+multipush(EIP);
+
+if(EC != 0 ) then
+	
+	print "ex err";
+	if(EC == 1) then
+		print "Illegal Instruction";
+	endif;
+	
+	if(EC == 2) then
+		print "Illegal Memory Access";
+	endif;
+	
+	if(EC == 3) then
+		print "Arithmetic Instruction";
+	endif;
+	
+	multipush(R1);
+	alias functionNum R1;
+	functionNum = EXIT_PROCESS;
+	R2 = [SYSTEM_STATUS_TABLE + 1];
+	call MOD_1;
+	multipop(R1);
+endif;
+
+if(EC == 0) then
+	if( EPN >= 4 && EPN <= 7) then
+		alias block R2;
+		block = [DISK_MAP_TABLE + [SYSTEM_STATUS_TABLE +1]*10 + EPN];
+		 
+		multipush(R1,R2);
+		alias functionNum R1;
+		functionNum = GET_CODE_PAGE;
+		call MOD_2;
+		multipop(R1,R2);
+		
+		[PTBR + 2*EPN] = R0;
+		[PTBR + 2*EPN + 1] = "1100";
+		
+	endif;
+	
+	if( EPN >= 2 && EPN <= 3) then
+		
+		multipush(R1,R2);
+		alias functionNum R1;
+		functionNum = GET_FREE_PAGE;
+		call MOD_2;
+		multipop(R1,R2);
+		
+		[PTBR + 4] = R0;
+		[PTBR + 5] = "1110";
+		
+		multipush(R1,R2);
+		functionNum = GET_FREE_PAGE;
+		call MOD_2;
+		multipop(R1,R2);
+		
+		[PTBR + 6] = R0;
+		[PTBR + 7] = "1110";
+		
+	endif;
+	
+endif;	 
+
+
+multipop(EIP);
+restore;
+
+[PROCESS_TABLE + [SYSTEM_STATUS_TABLE + 1] + 9] = 0;
+SP = [PROCESS_TABLE + ([SYSTEM_STATUS_TABLE + 1] * 16) + 13];
+SP = SP + 1;
+[[PTBR + 2 *(SP/512)]*512  + (SP % 512) ] = EIP;
+     
+ireturn;
+		
+		
+		
+		
+		
+		
+		
+		

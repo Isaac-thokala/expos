@@ -34,7 +34,7 @@ else
      alias currentPID R2;
      R3 = word;
      
-     functionNum = 3;
+     functionNum = TERMINAL_WRITE;
      currentPID = [PROCESS_TABLE + ( [SYSTEM_STATUS_TABLE + 1] * 16) + 1];
      
      call MOD_4;

@@ -1,0 +1,171 @@
+alias functionNum R1;
+alias currentPID R2;
+
+alias counter R3;
+
+if(functionNum == EXIT_PROCESS) then
+	
+	multipush(R1,R2,R3);
+	
+	alias functionNum R1;
+   	R1 = FREE_USER_AREA_PAGE;
+   	R2 = currentPID;
+   	call MOD_1;
+	
+	multipop(R1,R2,R3);
+	
+	multipush(R1,R2,R3);
+	
+	functionNum = FREE_PAGE_TABLE;
+   	R2 = currentPID;
+   	call MOD_1;
+	
+	multipop(R1,R2,R3);
+	
+	counter = 0;
+	while(counter < 16) do
+		if([PROCESS_TABLE + [SYSTEM_STATUS_TABLE + 1] * 16 + 9] != 9) then
+			if([PROCESS_TABLE + counter * 16 + 4] == WAIT_PROCESS && [PROCESS_TABLE + counter * 16 + 5] == currentPID) then
+				[PROCESS_TABLE + counter * 16 + 4] = READY;
+			endif;
+			
+			if([PROCESS_TABLE + counter * 16 + 2] == currentPID) then
+				[PROCESS_TABLE + counter * 16 + 2] = -1;
+			endif;
+		endif;
+		counter = counter + 1;
+	endwhile;
+	
+	[PROCESS_TABLE + (currentPID * 16) + 4] = TERMINATED;
+	
+	return;
+endif;
+
+if(functionNum == FREE_USER_AREA_PAGE) then
+	
+	counter = 0;
+	while(counter < 8) do
+		if([PROCESS_TABLE + currentPID * 16 + 11] + 496 + 2 * counter == 1) then
+			multipush(R1,R2,R3);
+			functionNum = RELEASE_SEMAPHORE;
+			R2 = [[PROCESS_TABLE + currentPID * 16 + 11] + 496 + 2 * counter + 1];
+			call MOD_2;
+			multipop(R1,R2,R3);
+		endif;
+		counter = counter + 1;
+		
+	endwhile;
+		
+	alias userpage R4;
+	userpage = [PROCESS_TABLE + (currentPID * 16) + 11];
+	
+	multipush(R1,R2);
+	
+        alias functionNum R1;
+        functionNum =RELEASE_PAGE ;
+        R2 = userpage;
+        call MOD_2;
+        
+        multipop(R1,R2);
+        
+        return;
+endif;
+
+if(functionNum == FREE_PAGE_TABLE) then
+
+
+	[PTBR+00] = -1;
+	[PTBR+01] = "0000";
+	[PTBR+02] = -1;
+	[PTBR+03] = "0000";
+	
+
+	counter = 2;
+	while(counter < 10) do
+	
+		if([PTBR + ( counter * 2 ) ] != -1) then
+			multipush(R1,R2,R3);
+			
+			alias functionNum R1;
+			functionNum = RELEASE_PAGE;
+			alias page R2;
+			R2 = [PTBR + ( counter * 2 ) ];
+			call MOD_2;
+			
+			multipop(R1,R2,R3);
+			[PTBR + (counter * 2)] = -1;
+			[PTBR + (counter * 2) + 1] = "0000";
+			
+		endif;
+		counter=counter+1;
+		
+	endwhile;
+	
+	
+	counter = 2;
+	while(counter < 4) do
+		if([DISK_MAP_TABLE + (currentPID * 10) + counter] != -1)then
+			
+			multipush(R1,R2,R3);
+			functionNum = RELEASE_BLOCK;
+			R2 = [DISK_MAP_TABLE + (currentPID * 10) + counter];
+			call MOD_2;
+			multipop(R1,R2,R3);
+			
+		endif;
+	counter = counter + 1;
+	endwhile;
+	
+	
+	counter = 8;
+	while(counter < 10) do
+		if([DISK_MAP_TABLE + (currentPID * 10) + counter] != -1)then
+			
+			multipush(R1,R2,R3);
+			functionNum = RELEASE_BLOCK;
+			R2 = [DISK_MAP_TABLE + (currentPID * 10) + counter];
+			call MOD_2;
+			multipop(R1,R2,R3);
+			
+		endif;
+	counter = counter + 1;
+	endwhile;
+	
+	
+	counter = 0;
+	while(counter < 10) do
+		[DISK_MAP_TABLE + (currentPID * 10) + counter] = -1;
+		counter = counter + 1;
+	endwhile;
+	
+	return;
+
+endif;
+
+
+if(functionNum == GET_PCB_ENTRY) then
+
+	breakpoint;
+	counter = 0;
+	while(counter < 16) do
+		if([PROCESS_TABLE + (counter * 16) + 4] == TERMINATED) then
+			[PROCESS_TABLE + (counter * 16) + 1] = counter;
+			[PROCESS_TABLE + (counter * 16) + 4] = ALLOCATED;
+			[PROCESS_TABLE + (counter * 16) + 14] = PAGE_TABLE_BASE + counter * 20 ;
+			[PROCESS_TABLE + (counter * 16) + 15] = 10;
+			R0 = counter;
+			
+			return;
+		endif;
+		counter = counter + 1;
+	endwhile;
+	
+	R0 = -1;
+	
+	breakpoint;
+	return;
+	
+endif; 
+
+
+

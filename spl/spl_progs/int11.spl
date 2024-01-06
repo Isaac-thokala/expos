@@ -1,0 +1,98 @@
+alias userSP R15;
+userSP=SP;
+
+[PROCESS_TABLE + [SYSTEM_STATUS_TABLE + 1] * 16 + 13] = SP;
+SP = [PROCESS_TABLE + [SYSTEM_STATUS_TABLE+1] * 16 + 11] * 512 - 1;
+ 
+alias system_call_number R14;
+system_call_number = [ [PTBR + 2 * ( (userSP-5)/512 )] * 512 + (userSP-5)%512];
+
+
+if(system_call_number == INT_GETPID) then
+
+	R0 = [SYSTEM_STATUS_TABLE + 1];
+	[[PTBR + 2 * ((userSP-1)/512) ] * 512 + (userSP-1)%512] = R0;
+endif;
+
+
+if(system_call_number == INT_GETPPID) then
+    
+	R0 = [PROCESS_TABLE + [SYSTEM_STATUS_TABLE + 1] * 16 + 2];
+	[[PTBR + 2 * ((userSP-1)/512)] * 512 + (userSP-1)%512] = R0; 
+endif;
+
+
+if(system_call_number == INT_WAIT)then
+ 
+ 	[PROCESS_TABLE + [SYSTEM_STATUS_TABLE + 1] * 16 + 9] = 13;
+	alias pid R13;
+	pid=[[PTBR + 2 * ((userSP-4)/512)] * 512 + (userSP-4)%512];
+      
+      	if(pid==[SYSTEM_STATUS_TABLE+1])then
+       
+      		[[PTBR + 2 * ((userSP-1)/512)] * 512 + (userSP-1)%512] = -1;
+        	[PROCESS_TABLE+[SYSTEM_STATUS_TABLE+1]*16+9]=0;
+        	SP=userSP;
+        	ireturn;
+ 	endif;
+        
+       	if([PROCESS_TABLE + pid * 16 + 4] == TERMINATED) then
+
+         	 [[PTBR + 2 * ((userSP-1)/512)] * 512 + (userSP-1)%512] = -1;
+         	 [PROCESS_TABLE + [SYSTEM_STATUS_TABLE+1] * 16 + 9] = 0;
+         	 SP=userSP;
+        	 ireturn;
+      	endif;
+       
+       	if(pid>15)then
+       
+        	[[PTBR + 2 * ((userSP-1)/512)] * 512 + (userSP-1)%512] = -1;
+        	[PROCESS_TABLE + [SYSTEM_STATUS_TABLE + 1] * 16 + 9] = 0;
+        	SP=userSP;
+        	ireturn;
+       	endif;
+       
+       	[PROCESS_TABLE + [SYSTEM_STATUS_TABLE + 1] * 16 + 4] = WAIT_PROCESS;
+       	[PROCESS_TABLE + [SYSTEM_STATUS_TABLE + 1] * 16 + 5] = pid;
+       
+       	multipush(R13,R14,R15);
+       	call MOD_5;
+       	multipop(R13,R14,R15);
+       
+      	[PROCESS_TABLE + [SYSTEM_STATUS_TABLE + 1] * 16 + 9] = 0;
+endif;
+
+
+if(system_call_number == INT_SIGNAL)then
+
+	[PROCESS_TABLE + [SYSTEM_STATUS_TABLE + 1] * 16 + 9] = 14;   
+	alias counter R12;
+	counter=0;
+	while(counter<16)do
+		if(([PROCESS_TABLE + counter * 16 + 4] == WAIT_PROCESS) && ([PROCESS_TABLE + counter * 16 + 5] == [SYSTEM_STATUS_TABLE + 1]))
+             then
+             		[PROCESS_TABLE + counter * 16 + 4] = READY;
+             	endif;
+                counter = counter + 1;
+	endwhile;
+           
+        [PROCESS_TABLE+[SYSTEM_STATUS_TABLE+1]*16+9]=0;
+endif;
+SP=userSP;
+ireturn;
+                 
+                   
+             
+             
+       
+       
+       
+       
+       
+       
+        
+                
+     
+
+
+

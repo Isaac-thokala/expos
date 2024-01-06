@@ -1,0 +1,127 @@
+alias functionNum R1;
+alias page R2;
+
+
+alias counter R3;
+counter = 0;
+	
+if(functionNum == GET_FREE_PAGE) then
+
+	breakpoint;
+	[SYSTEM_STATUS_TABLE + 3] = [SYSTEM_STATUS_TABLE + 3] + 1; 
+	while([SYSTEM_STATUS_TABLE + 2] == 0) do
+		[PROCESS_TABLE + ( [SYSTEM_STATUS_TABLE] * 16 ) + 4] = WAIT_MEM;
+		multipush(R1,R2);
+		
+		call MOD_5;
+		
+		multipop(R1,R2);
+		
+	endwhile;
+	
+	[SYSTEM_STATUS_TABLE + 3] = [SYSTEM_STATUS_TABLE + 3] - 1; 
+	[SYSTEM_STATUS_TABLE + 2] = [SYSTEM_STATUS_TABLE + 2] - 1;
+	
+	counter = 0;
+	while(counter < 128) do
+	
+		if([MEMORY_FREE_LIST + counter] == 0) then
+		
+			[MEMORY_FREE_LIST + counter] = 1;
+			R0 = counter;
+			break;
+		endif;
+		
+		counter = counter + 1;
+	endwhile;
+	breakpoint;
+	return;
+
+endif;
+
+
+
+if(functionNum == GET_CODE_PAGE) then
+	
+	counter = 0;
+	while(counter < 16) do
+		alias j R4;
+		j = 4;
+		while(j < 8) do
+			if( [DISK_MAP_TABLE + (counter * 10) + j ] == page) then 
+			//R2 named as page which actually is block
+				if([ PAGE_TABLE_BASE + counter * 16 + (j*2)] != -1) then
+				
+				R0 = [ PAGE_TABLE_BASE + counter * 16 + (j*2)];
+				[MEMORY_FREE_LIST + R0] = [MEMORY_FREE_LIST + R0] +1;
+				alias block R4;
+				block = [DISK_MAP_TABLE + (counter * 10) + j ];
+				breakpoint;
+				return;
+			
+				endif;
+			endif;
+			j = j +1;
+		endwhile;
+		counter = counter + 1;
+	endwhile;
+	
+	multipush(R1,R2,R3,R4);
+	functionNum = GET_FREE_PAGE;
+	call MOD_2;
+	multipop(R1,R2,R3,R4);
+	
+	alias memPage R0;
+	R15 = R0;
+	multipush(R1,R2,R3,R4, R15);
+	functionNum = DISK_LOAD;
+	R4=page;
+	R2=[SYSTEM_STATUS_TABLE + 1];
+	R3 = memPage; 
+	call MOD_4;
+	multipop(R1,R2,R3,R4, R15);
+	R0 = R15;
+	return;
+endif;
+
+
+
+if(functionNum == RELEASE_PAGE) then
+	
+	breakpoint;
+	[MEMORY_FREE_LIST + page] = [MEMORY_FREE_LIST + page] - 1;
+	if([MEMORY_FREE_LIST + page] == 0) then
+		[SYSTEM_STATUS_TABLE + 2]=[SYSTEM_STATUS_TABLE + 2] + 1;
+		
+		counter = 0;
+		while(counter < 16) do
+			if([PROCESS_TABLE + (counter*16) + 4] == WAIT_MEM) then
+			[PROCESS_TABLE + (counter*16) + 4] = READY;
+			
+			endif;
+			counter = counter + 1;
+		endwhile;
+	endif;
+	
+	breakpoint;
+	return;
+endif;
+
+
+
+if(functionNum == RELEASE_BLOCK) then
+
+	breakpoint;
+	[DISK_FREE_LIST + page] = [DISK_FREE_LIST + page] - 1; 
+	//page here is block
+	
+	breakpoint;
+	
+	return;
+endif; 
+
+
+
+	
+
+	

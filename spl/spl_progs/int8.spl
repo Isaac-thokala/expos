@@ -1,0 +1,178 @@
+breakpoint;
+[PROCESS_TABLE + [SYSTEM_STATUS_TABLE + 1] * 16 + 9] = 8;
+
+alias userSP R0;
+userSP = SP;                     //parentSP
+
+[PROCESS_TABLE + ( [SYSTEM_STATUS_TABLE + 1] * 16) + 13] = SP;
+SP = [PROCESS_TABLE + ([SYSTEM_STATUS_TABLE + 1] * 16) + 11] * 512 - 1;
+
+alias functionNum R1;
+alias parentPID R2;     
+alias childPID R3;
+alias counter R4;
+alias CPTBR R5;           //child pagetable address
+alias childSP R6;
+alias physicalAddrRetVal R7;
+
+multipush(R1,R2);
+    functionNum = GET_PCB_ENTRY;
+    parentPID = [SYSTEM_STATUS_TABLE +1];
+    call MOD_1;
+multipop(R1,R2);
+
+parentPID = [SYSTEM_STATUS_TABLE +1];
+
+childPID = R0;  //return value of get pcb is childPID
+
+if(childPID == -1) then
+///return in stack
+
+	physicalAddrRetVal = ([PTBR + 2 * ((userSP - 1) / 512)] * 512) + ((userSP - 1) % 512);
+	[physicalAddrRetVal] = -1;
+
+	[PROCESS_TABLE + (parentPID * 16) + 9] = 0;
+	SP = userSP;
+	ireturn;
+endif;
+
+
+
+CPTBR = PAGE_TABLE_BASE + 20 * childPID;
+
+
+
+
+if([PTBR + 4] == -1) then  //allocating heap pages
+	
+	counter = 0;
+	while(counter < 2) do
+		multipush(R1,R2,R3,R4);
+		functionNum = GET_FREE_PAGE;
+		call MOD_2;
+		multipop(R1,R2,R3,R4);
+		
+		[PTBR + 4 + (counter * 2)] = R0;
+		[PTBR + 5 + (counter * 2)] = "0110";
+		
+		counter =counter + 1;
+	endwhile;
+endif;
+
+[CPTBR ] = 63;
+[CPTBR + 1] = "0100";
+[CPTBR + 2] = 64;
+[CPTBR + 3] = "0100";
+
+counter = 0;
+while(counter < 2) do
+	[CPTBR + 4 + (counter * 2)] = [PTBR + 4 + (counter * 2)];
+	[CPTBR + 5 + (counter * 2)] = [PTBR + 5 + (counter * 2)];
+	
+	counter = counter + 1;
+endwhile;
+
+counter = 0;
+while(counter < 2) do           //stack pages
+	multipush(R1,R2,R3,R4);
+	functionNum = GET_FREE_PAGE;
+	call MOD_2;
+	multipop(R1,R2,R3,R4);
+	
+	//print R0;
+	[CPTBR + 16 + (counter * 2)] = R0;
+	[CPTBR + 17 + (counter * 2)] = "0110";
+	
+	counter = counter + 1;
+endwhile;
+
+multipush(R1,R2,R3,R4);           //user area page
+functionNum = GET_FREE_PAGE;
+call MOD_2;
+multipop(R1,R2,R3,R4);
+[PROCESS_TABLE + (childPID * 16) + 11] = R0;
+
+
+multipush(R1,R2,R3,R4);           //code page
+functionNum = GET_CODE_PAGE;
+R2 = [DISK_MAP_TABLE + parentPID * 10 + 4];
+call MOD_2;
+multipop(R1,R2,R3,R4);
+
+alias childpcb R10;
+alias parentpcb R11;
+childpcb = PROCESS_TABLE + (childPID * 16);
+parentpcb = PROCESS_TABLE + (parentPID * 16);
+
+[childpcb + 3] = [parentpcb + 3];
+[childpcb + 6] = [parentpcb + 6];
+[childpcb + 7] = [parentpcb + 7];
+[childpcb + 10] = [parentpcb + 10];
+[childpcb + 13] = [parentpcb + 13];
+[childpcb + 4] = CREATED;
+[childpcb + 9] = 0;
+[childpcb + 0] = 0;
+[childpcb + 2] = parentPID;
+[childpcb + 12] = 0;
+[childpcb + 1] = childPID;
+
+
+alias childuserpageadd R8;
+alias parentuserpageadd R9;
+alias semtableID R12;
+alias semprocesscount R13;
+
+childuserpageadd = [childpcb + 11] * 512;
+parentuserpageadd = [parentpcb + 11] * 512;
+
+counter = 0;         //copy per-process resource table
+while(counter < 8) do
+	[childuserpageadd + 496 + 2 * counter] = [parentuserpageadd + 496 + 2 * counter];
+	[childuserpageadd + 496 + 2 * counter + 1] = [parentuserpageadd + 496 + 2 * counter + 1];
+	if([childuserpageadd + 496 + 2 * counter] == 1) then 	//checking semaphores
+		semtableID = [childuserpageadd + 496 + 2 * counter + 1];
+		semprocesscount = [SEMAPHORE_TABLE + 4 * semtableID + 1];
+		semprocesscount = semprocesscount + 1;
+	endif;
+	counter = counter + 1;
+endwhile;
+
+
+counter =0;              //copying disk map table
+while(counter < 10) do
+	[DISK_MAP_TABLE + (childPID * 10) + counter] = [DISK_MAP_TABLE + (parentPID * 10) + counter];
+	counter = counter + 1;
+endwhile;
+
+
+counter = 0;              //copying page table entries
+while(counter < 8) do
+	[CPTBR + counter * 2] = [PTBR + counter * 2];
+	[CPTBR + 1 + counter * 2] = [PTBR + 1 + counter * 2];
+	[MEMORY_FREE_LIST + [PTBR + counter * 2]] = [MEMORY_FREE_LIST + [PTBR + counter * 2]] + 1;
+	counter = counter + 1;
+endwhile;
+
+
+counter = 0;             //copying user stack
+while(counter < 512) do
+	[[CPTBR + 16] * 512 + counter] = [[PTBR + 16] * 512 + counter];
+	[[CPTBR + 18] * 512 + counter] = [[PTBR + 18] * 512 + counter];
+	counter = counter + 1;
+endwhile;
+
+[[PROCESS_TABLE + childPID * 16 + 11] * 512] = BP;   //storing bp on top of child kernel stack
+//userSP = [PROCESS_TABLE + [SYSTEM_STATUS_TABLE + 1]*16 + 13];
+//physicalAddrRetVal = ([PTBR + 2 * ((userSP - 1) / 512)] * 512) + ((userSP - 1) % 512);
+[physicalAddrRetVal] = childPID;
+
+childSP = [PROCESS_TABLE + childPID * 16 + 13];
+physicalAddrRetVal = ([CPTBR + 2 * ((childSP - 1) / 512)] * 512) + ((childSP - 1) % 512);
+[physicalAddrRetVal] = 0;
+
+[PROCESS_TABLE + [SYSTEM_STATUS_TABLE + 1] * 16 + 9] = 0;
+//SP = [PROCESS_TABLE + [SYSTEM_STATUS_TABLE + 1]*16 + 13];
+SP = userSP;
+breakpoint;
+ireturn;
+		

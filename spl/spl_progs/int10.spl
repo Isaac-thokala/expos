@@ -1,0 +1,15 @@
+breakpoint;
+[PROCESS_TABLE + [SYSTEM_STATUS_TABLE + 1] * 16 + 9] = 10;
+
+[PROCESS_TABLE + ( [SYSTEM_STATUS_TABLE + 1] * 16) + 13] = SP;
+SP = [PROCESS_TABLE + ([SYSTEM_STATUS_TABLE + 1] * 16) + 11] * 512 - 1;
+
+alias functionNum R1;
+alias currentPID R2;
+
+functionNum = EXIT_PROCESS;
+currentPID = [SYSTEM_STATUS_TABLE + 1];
+call MOD_1;
+
+call MOD_5;
+
